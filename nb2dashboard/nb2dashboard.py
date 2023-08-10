@@ -50,23 +50,21 @@ class Dockerfile(object):
 
     # Text of the Dockerfile
     def __str__(self):
-        lines = ['FROM ' + self.base_image, '']
+        lines = [f'FROM {self.base_image}', '']
         if self.env:
-            s = ' '.join('{}="{}"'.format(k, v) for k, v in self.env.items())
-            lines.append('ENV ' + s)
+            s = ' '.join(f'{k}="{v}"' for k, v in self.env.items())
+            lines.append(f'ENV {s}')
         if self.labels:
-            s = ' '.join('{}="{}"'.format(k, v) for k, v in self.labels.items())
-            lines.append('LABEL ' + s)
+            s = ' '.join(f'{k}="{v}"' for k, v in self.labels.items())
+            lines.append(f'LABEL {s}')
         if self.files:
-            s = ', '.join('"{}"'.format(filename) for filename in self.files)
-            lines.append('ADD [{}, "/home/jovyan/"]'.format(s))
-        for command in self.build_commands:
-            lines.append('RUN ' + command)
+            s = ', '.join(f'"{filename}"' for filename in self.files)
+            lines.append(f'ADD [{s}, "/home/jovyan/"]')
+        lines.extend(f'RUN {command}' for command in self.build_commands)
         lines.append('')
-        cmd = self.commands[self.mode] + ['/home/jovyan/' + self.notebook]
-        cmd = ', '.join('"' + x + '"' for x in cmd)
-        lines.append('CMD [{}]'.format(cmd))
-        lines.append('')
+        cmd = self.commands[self.mode] + [f'/home/jovyan/{self.notebook}']
+        cmd = ', '.join(f'"{x}"' for x in cmd)
+        lines.extend((f'CMD [{cmd}]', ''))
         return "\n".join(lines)
 
 
@@ -74,7 +72,7 @@ class Dockerfile(object):
 class NB2Dashboard(object):
     def __init__(self, name, mode):
         self.name = name
-        self.build_dir = 'nb2dashboard-' + name
+        self.build_dir = f'nb2dashboard-{name}'
         self.make_build_dir()
         self.mode = mode
         self.dockerfile = Dockerfile(mode)
@@ -151,7 +149,7 @@ class NB2Dashboard(object):
     def notebook_from_url(self, url):
         r = requests.get(url, headers={'Accept': 'application/json'})
         if r.status_code != 200:
-            raise RuntimeError('{} {}'.format(r.status_code, r.reason))
+            raise RuntimeError(f'{r.status_code} {r.reason}')
         self.notebook = nbformat.reads(r.text, as_version=4)
         u = urllib.parse.urlparse(url)
         self.notebook_filename = u.path.split('/')[-1]
@@ -160,7 +158,7 @@ class NB2Dashboard(object):
 
     # Fetch notebook from an nbgallery instance
     def notebook_from_nbgallery(self, url):
-        r = self.notebook_from_url(url + '/download')
+        r = self.notebook_from_url(f'{url}/download')
         self.notebook_filename = r.headers['Content-Disposition'].split('"')[1]
         self.metadata['url'] = url
 
@@ -227,7 +225,7 @@ class NB2Dashboard(object):
 
     # Build the docker image
     def build(self):
-        command = 'sudo docker build -t nb2dashboard-{} {}'.format(self.name, self.build_dir)
+        command = f'sudo docker build -t nb2dashboard-{self.name} {self.build_dir}'
         print(command)
         status, output = subprocess.getstatusoutput(command)
         if status != 0:
